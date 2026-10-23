@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lector QR - DemoNotificador</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f4f6f8; margin: 0; }
+    .card { background: white; max-width: 450px; margin: 0 auto; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    button { 
+      background-color: #007bff; color: white; border: none; padding: 14px 24px; 
+      font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; 
+      margin-top: 15px; width: 100%; box-sizing: border-box; 
+    }
+    button:hover { background-color: #0056b3; }
+    #reader { width: 100%; margin-top: 15px; display: none; border-radius: 8px; overflow: hidden; }
+    #resultado { margin-top: 20px; font-weight: bold; line-height: 1.5; font-size: 15px; }
+    .exito { color: #28a745; }
+    .error { color: #dc3545; }
+  </style>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+  <div class="card">
+    <h2>Lector QR - DemoNotificador</h2>
+    <p>Escanea la CURA del estudiante usando la cámara en vivo.</p>
+    
+    <button id="btnEscanear" onclick="iniciarCamaraVivo()">Activar Cámara en Vivo</button>
+    <div id="reader"></div>
+
+    <div id="resultado"></div>
+  </div>
+
+  <script>
+    // Sustituye comillas por tu URL completa de Apps Script terminada en /exec
+    const URL_WEB_APP = "https://script.google.com/macros/s/AKfycbynIXbzp6uHEK2ng1uVMXnw9WPlhJZG47fcRMLx07gUDcbhN_FrlRCbmHxpombXt9Ge/exec";
+
+    let html5QrcodeScanner = null;
+
+    async function iniciarCamaraVivo() {
+      const divResultado = document.getElementById('resultado');
+      const readerDiv = document.getElementById('reader');
+      
+      divResultado.className = '';
+      divResultado.innerHTML = 'Iniciando cámara...';
+      readerDiv.style.display = 'block';
+
+      try {
+        if (!html5QrcodeScanner) {
+          html5QrcodeScanner = new Html5Qrcode("reader");
+        }
+
+        await html5QrcodeScanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess
+        );
+
+        divResultado.innerHTML = '📷 Cámara activa. Apunta al código QR...';
+      } catch (err) {
+        readerDiv.style.display = 'none';
+        divResultado.className = 'error';
+        divResultado.innerHTML = '❌ Error de cámara: ' + err;
+      }
+    }
+
+    function onScanSuccess(decodedText) {
+      if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+        html5QrcodeScanner.stop().then(() => {
+          document.getElementById('reader').style.display = 'none';
+          const divResultado = document.getElementById('resultado');
+          divResultado.className = '';
+          divResultado.innerHTML = '⏳ Código leído: <b>' + decodedText + '</b>. Procesando en DemoNotificador...';
+
+          fetch(`${URL_WEB_APP}?cura=${encodeURIComponent(decodedText)}`)
+            .then(response => response.json())
+            .then(res => {
+              if (res.exito) {
+                divResultado.className = 'exito';
+                divResultado.innerHTML = 
+                  '✔ Registro exitoso para: <b>' + res.estudiante + '</b><br>' +
+                  '📧 Correo enviado a: ' + res.correo + '<br><br>' +
+                  '<i>Abriendo WhatsApp...</i>';
+                
+                window.open(res.urlWhatsApp, '_blank');
+              } else {
+                divResultado.className = 'error';
+                divResultado.innerHTML = '❌ ' + res.mensaje;
+              }
+            })
+            .catch(err => {
+              divResultado.className = 'error';
+              divResultado.innerHTML = 'Error al conectar con el servidor: ' + err;
+            });
+        }).catch(err => console.error(err));
+      }
+    }
+  </script>
+</body>
+</html>
